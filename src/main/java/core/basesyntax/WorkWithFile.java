@@ -1,39 +1,68 @@
 package core.basesyntax;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class WorkWithFile {
+    private static final String SUPPLY = "supply";
+    private static final String BUY = "buy";
+    private static final String RESULT = "result";
+    private static final String DELIMITER = ",";
+
     public void getStatistic(String fromFileName, String toFileName) {
-        int supply = 0;
-        int buy = 0;
+        String[] data = readData(fromFileName);
+        int[] totals = calculateTotals(data);
+        String report = createReport(totals[0], totals[1]);
+        writeReport(toFileName, report);
+    }
 
-        try {
-            for (String line : Files.readAllLines(Path.of(fromFileName))) {
-                String[] parts = line.split(",");
-                if (parts.length != 2) {
-                    continue;
-                }
+    private String[] readData(String fromFileName) {
+        try (BufferedReader reader = Files.newBufferedReader(Path.of(fromFileName))) {
+            return reader.lines().toArray(String[]::new);
+        } catch (IOException e) {
+            throw new RuntimeException("Can't read from file: " + fromFileName, e);
+        }
+    }
 
-                String operation = parts[0].trim();
-                int amount = Integer.parseInt(parts[1].trim());
+    private int[] calculateTotals(String[] data) {
+        int supplyTotal = 0;
+        int buyTotal = 0;
 
-                if (operation.equals("supply")) {
-                    supply += amount;
-                } else if (operation.equals("buy")) {
-                    buy += amount;
-                }
+        for (String line : data) {
+            String[] parts = line.split(DELIMITER);
+            if (parts.length != 2) {
+                continue;
             }
 
-            int result = supply - buy;
+            String operation = parts[0].trim();
+            int amount = Integer.parseInt(parts[1].trim());
 
-            String report = String.format("supply,%d%nbuy,%d%nresult,%d", supply, buy, result);
+            if (operation.equals(SUPPLY)) {
+                supplyTotal += amount;
+            } else if (operation.equals(BUY)) {
+                buyTotal += amount;
+            }
+        }
+        return new int[]{supplyTotal, buyTotal};
+    }
 
-            Files.writeString(Path.of(toFileName), report);
+    private String createReport(int supplyTotal, int buyTotal) {
+        int result = supplyTotal - buyTotal;
+        return new StringBuilder()
+                .append(SUPPLY).append(DELIMITER).append(supplyTotal).append(System.lineSeparator())
+                .append(BUY).append(DELIMITER).append(buyTotal).append(System.lineSeparator())
+                .append(RESULT).append(DELIMITER).append(result)
+                .toString();
+    }
 
+    private void writeReport(String toFileName, String report) {
+        try (BufferedWriter writer = Files.newBufferedWriter(Path.of(toFileName))) {
+            writer.write(report);
         } catch (IOException e) {
-            throw new RuntimeException("Can't process file: " + fromFileName, e);
+            throw new RuntimeException("Can't write to file: " + toFileName, e);
         }
     }
 }
